@@ -1,0 +1,9 @@
+# Inference + Qt GUI. Match saved sklearn/torch training environment when possible.
+PySide6>=6.6,<7
+numpy>=1.26,<3
+pandas>=2.1,<3
+scipy>=1.10,<2
+scikit-learn>=1.4,<2
+joblib>=1.3,<2
+torch>=2.4,<3
+openpyxl>=3.1,<4
