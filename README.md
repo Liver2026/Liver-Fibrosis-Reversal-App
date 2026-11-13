@@ -1,63 +1,62 @@
 # FRM × MTEM — Desktop Research Studio
 
-A public-source, **local inference** desktop app adapted from `FRM_MTEM_Desktop_App_SHAP_Updated(1).zip` to use the **actual architecture and checkpoint format** from `最终代码(2).py` (preserved verbatim as `research/final_code_original.py`).
+[中文说明](README_中文.md)
 
-The GUI keeps its three modes (FRM only, MTEM only, combined), six main clinical input fields, automatically derived FIB-4/APRI, baseline Ishak, dual pathology selectors, probability/result cards and CSV export. Its original V24 FRM / V63A–V61B tree-stack predictor has **been removed**. The new inference adapter uses the chosen sklearn FRM and the original `MTEM444` **UNI2-h / cross-stain attention / two-treatment-head** PyTorch network. It applies each fold's saved clinical preprocessing and **arm-specific Platt calibrators**, then averages the calibrated outputs of the outer-fold models.
+FRM × MTEM is a local desktop application for liver fibrosis reversal prediction and treatment-response analysis. It brings together the clinical Fibrosis Reversal Model (FRM) and the Multimodal Treatment Effect Model (MTEM) in one interface. MTEM combines pretreatment clinical variables with paired H&E and Masson pathology features, using UNI2-h embeddings, cross-stain attention, and two treatment-specific prediction heads.
 
-> **Status:** The uploaded materials contained **source code only**. Neither the original app's deployed weights nor the newly trained FRM/MTEM checkpoints were supplied. This repository is a **source-level conversion, not a pre-trained executable**. No real-patient prediction or clinical equivalence has been demonstrated here. Do not treat it as an approved clinical decision aid.
+## Features
 
-## Files
+- Three analysis modes: FRM, MTEM, and combined FRM + MTEM.
+- Graphical entry of baseline clinical measurements and Ishak stage, with automatic FIB-4 and APRI calculation.
+- H&E / Masson pathology input through whole-slide images or pre-encoded UNI2-h features.
+- FRM inference with the saved scikit-learn classifier; MTEM inference with the PyTorch two-head architecture.
+- Checkpoint-specific preprocessing and probability calibration, with predictions displayed in the interface.
+- Local inference and CSV result export.
+
+## Repository structure
 
 ```text
-FRM_MTEM_Desktop_App.py          # Original Qt interface, updated model backend
-model_architecture.py           # Exact final-code network and NPZ validators
-deployment_runtime.py          # New FRM / MTEM checkpoint inference adapter
-wsi_runtime.py                  # Optional original WSI -> UNI2-h encoding route
-research/final_code_original.py # Unmodified uploaded research/training source
-models/.gitkeep                 # Private model assets go here, never to Git
-requirements.txt               # Base Qt / inference dependencies
-requirements-wsi.txt           # Additional source-faithful WSI dependencies
-scripts/check_deployment.py    # Check required files / checkpoint metadata
-tests/                         # Synthetic inference and validation tests
-.github/workflows/ci.yml       # Static checks and unit tests
-.gitignore                     # Exclude patient data, weights and WSI caches
+FRM_MTEM_Desktop_App.py         Desktop application and GUI
+deployment_runtime.py          Checkpoint loading and inference
+model_architecture.py          MTEM network and feature validation
+wsi_runtime.py                 WSI processing and UNI2-h encoding
+research/training_pipeline.py  Model training and research analysis
+scripts/check_deployment.py    Local model configuration check
+requirements.txt               Base dependencies
+requirements-wsi.txt           Optional WSI dependencies
+models/                        Local model directory
+tests/                         Automated tests
 ```
 
-## 1. Environment
+## Installation
 
-Recommended: Python 3.11 / 3.12, isolated virtual environment, Windows or Linux with PySide6 support. Use a **matching Python, PyTorch, sklearn and timm environment** for the original training artifacts. For GPU inference, select a compatible official PyTorch build for your CUDA version.
+Python 3.11 or 3.12 is recommended. From the project root, create a virtual environment and install the base dependencies:
 
 ```bash
 python -m venv .venv
-# Windows PowerShell:
-.venv\Scripts\Activate.ps1
+# Windows PowerShell: .venv\Scripts\Activate.ps1
 # Linux/macOS: source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-To run on original WSI files rather than pre-encoded UNI2-h `.npz`:
+For direct whole-slide image processing, install the optional dependencies:
 
 ```bash
 python -m pip install -r requirements-wsi.txt
 ```
 
-WSI mode also requires **system OpenSlide**, the UNI2-h pretrained model downloaded under its own access/licensing conditions, and **the original Vahadane reference images from training**. These are not included. If not available, use the already encoded baseline `.npz` features generated by the research pipeline. The model requires **both** HE and MASSON.
-
-## 2. Copy model files from a REAL training run
-
-The uploaded `最终代码(2).py` writes the needed inference artifacts when run with true patient datasets and `--save-fold-models` enabled (default). For example, from a private location **outside the GitHub repository**:
+Start the application:
 
 ```bash
-python research/final_code_original.py --mode run \
-  --frm /private/path/frm_patients.csv \
-  --mtem /private/path/mtem_patients.csv \
-  --out /private/path/trained_results \
-  --save-fold-models
+python scripts/check_deployment.py
+python FRM_MTEM_Desktop_App.py
 ```
 
-The research script has strict input schema and cohort validation and will **not** train without properly formatted real input data. The included `--mode demo` creates synthetic results and is **not** a substitute for a real model.
+Windows users may also launch `start_windows.bat`.
 
-From `/private/path/trained_results/fold_models/` copy into the local **ignored** `models/` directory:
+## Model setup
+
+Place compatible trained checkpoints in the local `models/` directory:
 
 ```text
 models/
@@ -74,77 +73,33 @@ models/
   MTEM444_fold5_preprocessing.joblib
 ```
 
-All folds must come **from the same run**. The default final-code configuration uses five outer folds. If you explicitly trained with a different number of folds, set `FRM_MTEM_EXPECTED_FOLDS` to that number. The app loads only `MTEM444` (not the `Clinical444` or `Clinical727` comparison networks).
+All MTEM checkpoints and preprocessing files should come from the same compatible training run. Five folds are expected by default; `FRM_MTEM_EXPECTED_FOLDS` can be used to configure another fold count. Alternatively, set `FRM_MTEM_MODEL_DIR` to a local model directory.
 
-**Do not upload `.pt`, `.joblib`, patient CSV, WSI or NPZ, image tiles or cache files to a public repository.** If intentionally distributing real model weights later, audit privacy, provenance, licenses and checkpoint security before doing so. `joblib` files are pickle-based: **load trusted checkpoints only**.
+This source repository does not bundle trained model weights. Compatible checkpoints can be generated using `research/training_pipeline.py` with appropriately formatted research datasets.
 
-## 3. Pathology inputs
+## Inputs
 
-There are two supported, mutually exclusive routes; the original two image selection buttons remain.
+**Clinical:** Enter baseline measurements and Ishak stage in the GUI. FIB-4 and APRI are calculated automatically. Any additional trained clinical fields are handled using the saved preprocessing configuration and identified in the results.
 
-**Option A — Original encoded .npz (preferred for verifiable, fast deployment)**
+**Pathology:** MTEM requires pretreatment H&E and Masson inputs from the same patient. Two input routes are available:
 
-Generate baseline H&E / Masson features using the `--mode preprocess` and `--mode encode` steps in the supplied research code. In the desktop selectors choose the matching `HE.npz` and `MASSON.npz` files for **the same patient**. The adapter checks the original encoding metadata: `MahmoodLab/UNI2-h`, 20×, 512px original tiles, 224px model input, eight augmentation variants, metadata-proven Vahadane normalization and patient ID. For inference, it uses augmentation index `0`, exactly as the source's `PatientDataset(augment=False)` does. Each fold enforces its stored `max_tiles` capacity.
+- **Encoded features:** Select matching UNI2-h `.npz` files. Patient identifiers, stain labels, and encoding metadata are checked automatically.
+- **Whole-slide images:** Select supported WSI files such as `.svs`, `.tif`, or `.ndpi`. This route additionally requires OpenSlide, the UNI2-h encoder, and the training-time stain reference images at `models/reference-he.png` and `models/reference-masson.png`.
 
-**Option B — Baseline WSI (requires original stain references and additional software)**
+## Quick start
 
-Put the exact training-time Vahadane reference images in the locally ignored model directory:
+1. Launch the app and select FRM, MTEM, or combined analysis.
+2. Enter baseline clinical inputs; for MTEM, select H&E and Masson files.
+3. Run the analysis to view the FRM reversal probability and/or MTEM treatment-specific probabilities and their difference.
+4. Export the displayed results to CSV.
 
-```text
-models/reference-he.png
-models/reference-masson.png
-```
-
-Then select baseline `.svs`, `.tif`, `.ndpi` or another supported WSI with valid `openslide.mpp-x/y` metadata. `wsi_runtime.py` invokes the *unchanged* original research pipeline's `preprocess_wsi_baseline` and `encode_baseline_tiles` functions, using the original 20×/0.5µm-per-pixel, Otsu tissue threshold, Vahadane normalization, 512px tiles, eight augmentation variants and UNI2-h. It uses a local temporary directory; processing large WSIs can be resource-intensive. It does **not** use the old mean-embedding extraction method or bypass required normalization.
-
-If the frozen references, original model encoder, required system packages, or original WSI metadata are unavailable, WSI inference intentionally stops with an explanatory error. It does not invent image features or approximate missing model assets.
-
-## 4. Start the desktop app
-
-```bash
-python scripts/check_deployment.py
-python FRM_MTEM_Desktop_App.py
-```
-
-The interface can open without pretrained files, but the inference button will report missing weights until they are placed in `models/`. You can alternatively store models outside the repository:
-
-```bash
-# Linux/macOS
-export FRM_MTEM_MODEL_DIR=/private/path/fold_models
-# Windows PowerShell
-$env:FRM_MTEM_MODEL_DIR="D:\private_models\fold_models"
-```
-
-### What changed / what did not
-
-- **Changed:** predictor implementation and weights format, model verification, probability calibration, WSI-to-NPZ bridge, updated scientific text explaining original feature schemas, missing-feature transparency.
-- **Preserved:** original interface layout/theme, FRM-only / MTEM-only / joint modes, baseline input controls, derived FIB-4/APRI, WSI file selectors (also accept `.npz`), output probability cards, per-patient CSV export, local processing, error messages, Qt worker thread.
-- **No SHAP visualization added:** the old application contained **SHAP-related text**, not a live SHAP chart. The research training script still contains its original Shapley calculations; the desktop tool does not claim to run these for each new patient.
-
-### Input limitation you should know
-
-The GUI inherited from the previous app exposes six measured values plus baseline Ishak; **the final-code models can use additional `clinical_` training features**. The adapter strictly preserves trained feature order and uses **the saved model's original training-time imputer** for any unentered feature (rather than fake data or newly fitted medians). Those feature names are displayed in the result note and exported in the CSV. A prediction with many such missing features **may not match** the original full-feature training pipeline and should not be used as a clinically valid estimate. For full-feature parity, the app must be supplied all required model input fields and independently validated; that full-feature UI is **not part of this unchanged-interface conversion**.
-
-The stored MTEM models are **outer cross-validation fold models**, not a distinct final retrained production model. Their simple calibrated mean provides an implementable new-patient deployment convention, **not** a validation of clinical performance; it need not match published **OOF per-patient** scores. Model architecture, output meanings (P(72-week reversal | ETV), P(72-week reversal | ETV+BRC)), and the displayed `P_B - P_A` remain distinct from an observed individual causal treatment effect.
-
-## 5. Verify and upload to GitHub
+## Development and tests
 
 ```bash
 python -m compileall -q .
 python -m pytest -q tests
-# Initialise and push a repo after reviewing staged files:
-git init
-git add .
-git status --short
-git commit -m "Replace desktop predictor with final-code FRM and MTEM inference"
-# Create your own empty GitHub repository then:
-git branch -M main
-git remote add origin https://github.com/YOUR_ACCOUNT/YOUR_REPO.git
-git push -u origin main
 ```
 
-Make your own licensing decision before choosing a public open-source license. No license is assumed or granted automatically by this package. The original files and references can have separate third-party licenses; in particular, UNI2-h model weights are downloaded separately.
+Model artifacts, patient data, and pathology files are excluded from Git by `.gitignore`. Configure dependencies for your environment and follow applicable licenses for third-party tools and model assets.
 
-## Tests run for this project
-
-The included tests build **synthetic, temporary** sklearn and torch checkpoint fixtures to check feature ordering, data loading, calibration and the use of actual MTEM model weights. Passing them demonstrates only implementation coherence. It does **not** validate trained model behavior or actual WSI preprocessing. Full real-case checks require the original model files and a held-out de-identified case with corresponding output from the original pipeline.
+This project is intended for research and software development.
